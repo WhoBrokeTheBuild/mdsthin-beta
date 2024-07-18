@@ -110,6 +110,9 @@ class Connection:
         return msg, data
 
     def get(self, expr, *args):
+
+        if expr.strip() == '':
+            return Descriptor()
         
         mget = Message(expr, compression_level=self._compression_level)
         mget.nargs = 1 + len(args)
@@ -135,12 +138,12 @@ class Connection:
         return data
 
     def getObject(self, expr, *args):
-        return self.get(f'SerializeOut(`({expr};))', *args).deserialize()
+        return self.get(f'SerializeOut(`({expr};))', *args).deserialize(conn=self)
 
     def put(self, path, expr, *args):
         args = [path, expr] + list(args)
         args_format = ','.join('$' * len(args))
-        status = self.get(f'TreePut({args_format})')
+        status = self.get(f'TreePut({args_format})', *args)
 
         if STATUS_NOT_OK(status):
             raise getException(status)
@@ -192,10 +195,17 @@ class Connection:
                 break
 
             command = command.strip()
+            
+            # Empty command
+            if len(command) == 0:
+                continue
+
             if command == 'exit':
                 break
 
-            print(self.tcl(command), end='')
+            result = self.tcl(command)
+            if result is not None:
+                print(result, end='')
     
     def tdic(self):
 
@@ -211,6 +221,7 @@ class Connection:
                 break
 
             command = command.strip()
+
             if command == 'exit':
                 break
 
@@ -220,8 +231,10 @@ class Connection:
             except MdsException as e:
                 print(e)
 
-            if result is not None:
-                print(result.data())
+            if result is None:
+                print(repr(dMISSING()))
+            else:
+                print(repr(result))
 
 class GetMany:
     
@@ -236,6 +249,12 @@ class GetMany:
             'exp': exp,
             'args': list(args),
         }))
+
+    def remove(self, name):
+        for query in self._queries:
+            if query['name'] == name:
+                self._queries.remove(query)
+                break
 
     def execute(self):
         result = self._connection.get('GetManyExecute($)', self._queries.serialize())
@@ -276,5 +295,5 @@ class PutMany:
         if isinstance(self._result, String):
             raise MDSplusException(f'PutMany Error: {self._result.data()}')
         
-        self._result = result.deserialize()
+        self._result = result.deserialize(conn=self)
         return self._result

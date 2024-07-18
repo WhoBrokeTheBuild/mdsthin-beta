@@ -1,10 +1,10 @@
 
 import unittest
 
-from .BaseTestCase import *
 from ..connection import *
+from ..functions import *
 
-class ConnectionTest(BaseTestCase):
+class ConnectionTest(unittest.TestCase):
 
     SERVER = ''
 
@@ -94,7 +94,7 @@ class ConnectionTest(BaseTestCase):
         root_conn = Connection(self.SERVER, username='root')
 
         whoami = root_conn.get('whoami()').data()
-        self.assertEqual(whoami, 'nobody')
+        self.assertEqual(whoami, 'nobody', msg='Claiming to be root should map you to nobody.')
 
     def test_empty_get(self):
 

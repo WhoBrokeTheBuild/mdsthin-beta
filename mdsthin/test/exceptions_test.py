@@ -2,10 +2,9 @@
 import numpy
 import unittest
 
-from .BaseTestCase import *
 from ..exceptions import *
 
-class ExceptionsTest(BaseTestCase):
+class ExceptionsTest(unittest.TestCase):
 
     def test_status(self):
 

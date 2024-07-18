@@ -2,10 +2,10 @@
 import numpy
 import unittest
 
-from .BaseTestCase import *
 from ..connection import *
+from ..functions import *
 
-class CModTest(BaseTestCase):
+class CModTest(unittest.TestCase):
 
     SERVER = ''
 
@@ -43,7 +43,7 @@ class CModTest(BaseTestCase):
 
         self.assertRaises(TdiINVCLADTY, self.conn.get, 'ADMIN.CHECKCAMAC')
 
-        compare = Action(Dispatch(2, 'ALCDATA_ANALYSIS', 'INIT', 999, ''), Function(162, None, 'CheckCamacServers'), '', None, None)
+        compare = Action(Dispatch(2, 'ALCDATA_ANALYSIS', 'INIT', 999, ''), EXT_FUNCTION(None, 'CheckCamacServers'), '', None, None)
 
         data = self.conn.getObject('ADMIN.CHECKCAMAC')
 

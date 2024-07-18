@@ -2,10 +2,9 @@
 import numpy
 import unittest
 
-from .BaseTestCase import *
 from ..descriptors import *
 
-class SerializeTest(BaseTestCase):
+class SerializeTest(unittest.TestCase):
 
     def test_pack_unpack(self):
 

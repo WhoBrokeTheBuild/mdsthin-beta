@@ -2,10 +2,9 @@
 import numpy
 import unittest
 
-from .BaseTestCase import *
 from ..descriptors import *
 
-class DescriptorsTest(BaseTestCase):
+class DescriptorsTest(unittest.TestCase):
 
     def test_integer_limits(self):
 

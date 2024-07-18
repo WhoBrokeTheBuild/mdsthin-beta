@@ -105,18 +105,8 @@ class Descriptor:
                 cls = DTYPE_CLASS_MAP[dsc.class_id][dsc.dtype_id]
 
             else:
-                if isinstance(data, (DescriptorS, DescriptorA)):
+                if isinstance(data, Descriptor):
                     cls = type(data)
-                    data = data.data()
-
-                # TODO: APD
-
-                elif isinstance(data, DescriptorR):
-                    arguments = list(data.dscptrs)
-                    if data._data is not None:
-                        arguments = [data._data] + arguments
-                    
-                    
 
                 elif isinstance(data, str):
                     cls = String
@@ -198,6 +188,8 @@ class Descriptor:
         return self._data
 
     def __repr__(self):
+        if self._data is None:
+            return '*'
         return f'{self.__class__.__name__}({self._data})'
     
     def __eq__(self, other):
@@ -222,7 +214,7 @@ class Descriptor:
         return bytes()
     
     @staticmethod
-    def unpack(buffer):
+    def unpack(buffer, conn=None):
 
         buffer = bytearray(buffer)
         
@@ -259,6 +251,9 @@ class Descriptor:
             
             elif dsc.dtype_id in [ DTYPE_F, DTYPE_D, DTYPE_G ]:
                 data = convert_float(dsc.dtype_id, data_buffer)
+
+            if dtype_class is TreeNID:
+                return TreeNID(data, conn=conn)
                 
             return dtype_class(data)
 
@@ -339,7 +334,7 @@ class Descriptor:
                     continue
 
                 data_buffer = buffer[offset : ]
-                descs.append(Descriptor.unpack(data_buffer))
+                descs.append(Descriptor.unpack(data_buffer, conn=conn))
 
             return dtype_class(descs=descs)
             
@@ -364,7 +359,7 @@ class Descriptor:
                     continue
 
                 dscptr_buffer = buffer[ offsets[i] : ]
-                arguments.append(Descriptor.unpack(dscptr_buffer))
+                arguments.append(Descriptor.unpack(dscptr_buffer, conn=conn))
 
             return dtype_class(*arguments)
 
@@ -423,7 +418,7 @@ class String(DescriptorS):
         )
 
     def __repr__(self):
-        return f'String("{self._data}")'
+        return f'"{self._data}"'
 
     def pack_data(self):
         return bytearray(self._data.encode('ascii'))
@@ -435,9 +430,13 @@ class String(DescriptorS):
 class Ident(DescriptorS):
     pass
 
-class NID(DescriptorS):
-    def __init__(self, data=0):
+class TreeNID(DescriptorS):
+    def __init__(self, data=0, conn=None):
+        if isinstance(data, Descriptor):
+            data = data.data()
+
         data = numpy.uint32(data)
+        self._conn = conn
 
         super().__init__(
             data=data,
@@ -447,11 +446,42 @@ class NID(DescriptorS):
             ),
         )
 
-class Path(DescriptorS):
-    pass
+    def __repr__(self):
+        if self._conn is not None:
+            return self._conn.get(f'getnci({self._data}, "FULLPATH")').data()
+        return f'NID({self._data})'
+
+class TreePath(DescriptorS):
+
+    def __init__(self, data=''):
+        if isinstance(data, Descriptor):
+            data = data.data()
+            
+        data = str(data)
+
+        super().__init__(
+            data=data,
+            dsc=mdsdsc_s_t(
+                length=len(data.encode('ascii')),
+                dtype_id=DTYPE_T,
+            ),
+        )
+
+    def __repr__(self):
+        return str(self._data)
+
+    def pack_data(self):
+        return bytearray(self._data.encode('ascii'))
+    
+    @staticmethod
+    def unpack_data(buffer):
+        return String(buffer.decode('ascii'))
 
 class UInt8(DescriptorS, Numeric):
     def __init__(self, data=0):
+        if isinstance(data, Descriptor):
+            data = data.data()
+
         data = numpy.uint8(data)
 
         super().__init__(
@@ -461,9 +491,15 @@ class UInt8(DescriptorS, Numeric):
                 dtype_id=DTYPE_BU,
             ),
         )
+
+    def __repr__(self):
+        return f'{self.data()}BU'
     
 class UInt16(DescriptorS, Numeric):
     def __init__(self, data=0):
+        if isinstance(data, Descriptor):
+            data = data.data()
+            
         data = numpy.uint16(data)
 
         super().__init__(
@@ -474,8 +510,14 @@ class UInt16(DescriptorS, Numeric):
             ),
         )
 
+    def __repr__(self):
+        return f'{self.data()}WU'
+
 class UInt32(DescriptorS, Numeric):
     def __init__(self, data=0):
+        if isinstance(data, Descriptor):
+            data = data.data()
+            
         data = numpy.uint32(data)
 
         super().__init__(
@@ -486,8 +528,14 @@ class UInt32(DescriptorS, Numeric):
             ),
         )
 
+    def __repr__(self):
+        return f'{self.data()}LU'
+
 class UInt64(DescriptorS, Numeric):
     def __init__(self, data=0):
+        if isinstance(data, Descriptor):
+            data = data.data()
+            
         data = numpy.uint64(data)
 
         super().__init__(
@@ -498,8 +546,14 @@ class UInt64(DescriptorS, Numeric):
             ),
         )
 
+    def __repr__(self):
+        return f'{self.data()}QU'
+
 class Int8(DescriptorS, Numeric):
     def __init__(self, data=0):
+        if isinstance(data, Descriptor):
+            data = data.data()
+            
         data = numpy.int8(data)
 
         super().__init__(
@@ -510,8 +564,14 @@ class Int8(DescriptorS, Numeric):
             ),
         )
 
+    def __repr__(self):
+        return f'{self.data()}B'
+
 class Int16(DescriptorS, Numeric):
     def __init__(self, data=0):
+        if isinstance(data, Descriptor):
+            data = data.data()
+            
         data = numpy.int16(data)
 
         super().__init__(
@@ -522,8 +582,14 @@ class Int16(DescriptorS, Numeric):
             ),
         )
 
+    def __repr__(self):
+        return f'{self.data()}W'
+
 class Int32(DescriptorS, Numeric):
     def __init__(self, data=0):
+        if isinstance(data, Descriptor):
+            data = data.data()
+            
         data = numpy.int32(data)
 
         super().__init__(
@@ -534,8 +600,14 @@ class Int32(DescriptorS, Numeric):
             ),
         )
 
+    def __repr__(self):
+        return f'{self.data()}L'
+
 class Int64(DescriptorS, Numeric):
     def __init__(self, data=0):
+        if isinstance(data, Descriptor):
+            data = data.data()
+            
         data = numpy.int64(data)
 
         super().__init__(
@@ -546,8 +618,14 @@ class Int64(DescriptorS, Numeric):
             ),
         )
 
+    def __repr__(self):
+        return f'{self.data()}Q'
+
 class Float32(DescriptorS, Numeric):
     def __init__(self, data=0.0):
+        if isinstance(data, Descriptor):
+            data = data.data()
+            
         data = numpy.float32(data)
 
         super().__init__(
@@ -558,8 +636,14 @@ class Float32(DescriptorS, Numeric):
             ),
         )
 
+    def __repr__(self):
+        return f'{self.data()}F0'
+
 class Float64(DescriptorS, Numeric):
     def __init__(self, data=0.0):
+        if isinstance(data, Descriptor):
+            data = data.data()
+            
         data = numpy.float64(data)
 
         super().__init__(
@@ -569,6 +653,9 @@ class Float64(DescriptorS, Numeric):
                 dtype_id=DTYPE_FT,
             ),
         )
+
+    def __repr__(self):
+        return f'{self.data()}D0'
 
 ###
 ### DescriptorA
@@ -674,6 +761,8 @@ class DescriptorA(Descriptor):
 
 class StringArray(DescriptorA):
     def __init__(self, data=[]):
+        if isinstance(data, Descriptor):
+            data = data.data()
 
         data = numpy.array(data, dtype=str)
         shape = data.shape
@@ -701,7 +790,7 @@ class StringArray(DescriptorA):
         )
 
     def __repr__(self):
-        return f'StringArray({self._data.astype(str)})'
+        return repr(self._data.astype(str))
 
     def __eq__(self, other):
         if isinstance(other, Descriptor):
@@ -730,8 +819,12 @@ class StringArray(DescriptorA):
 
 class UInt8Array(DescriptorA, Numeric):
     def __init__(self, data=[]):
-        if isinstance(data, (bytes, bytearray, memoryview)):
+        if isinstance(data, Descriptor):
+            data = data.data()
+
+        elif isinstance(data, (bytes, bytearray, memoryview)):
             data = numpy.frombuffer(data, dtype=numpy.uint8)
+
         else:
             data = numpy.array(data, dtype=numpy.uint8)
 
@@ -743,11 +836,17 @@ class UInt8Array(DescriptorA, Numeric):
             ),
         )
 
-    def deserialize(self):
-        return Descriptor.unpack(bytearray(self.data().tobytes()))
+    def __repr__(self):
+        return f'Byte_Unsigned({repr(self._data)})'
+
+    def deserialize(self, conn=None):
+        return Descriptor.unpack(bytearray(self.data().tobytes()), conn=conn)
 
 class UInt16Array(DescriptorA, Numeric):
     def __init__(self, data=[]):
+        if isinstance(data, Descriptor):
+            data = data.data()
+
         data = numpy.array(data, dtype=numpy.uint16)
 
         super().__init__(
@@ -758,8 +857,14 @@ class UInt16Array(DescriptorA, Numeric):
             ),
         )
 
+    def __repr__(self):
+        return f'Word_Unsigned({repr(self._data)})'
+
 class UInt32Array(DescriptorA, Numeric):
     def __init__(self, data=[]):
+        if isinstance(data, Descriptor):
+            data = data.data()
+            
         data = numpy.array(data, dtype=numpy.uint32)
 
         super().__init__(
@@ -770,8 +875,14 @@ class UInt32Array(DescriptorA, Numeric):
             ),
         )
 
+    def __repr__(self):
+        return f'Long_Unsigned({repr(self._data)})'
+
 class UInt64Array(DescriptorA, Numeric):
     def __init__(self, data=[]):
+        if isinstance(data, Descriptor):
+            data = data.data()
+            
         data = numpy.array(data, dtype=numpy.uint64)
 
         super().__init__(
@@ -782,10 +893,17 @@ class UInt64Array(DescriptorA, Numeric):
             ),
         )
 
+    def __repr__(self):
+        return f'Quadword_Unsigned({repr(self._data)})'
+
 class Int8Array(DescriptorA, Numeric):
     def __init__(self, data=[]):
-        if isinstance(data, (bytes, bytearray, memoryview)):
+        if isinstance(data, Descriptor):
+            data = data.data()
+            
+        elif isinstance(data, (bytes, bytearray, memoryview)):
             data = numpy.frombuffer(data, dtype=numpy.int8)
+
         else:
             data = numpy.array(data, dtype=numpy.int8)
 
@@ -797,11 +915,17 @@ class Int8Array(DescriptorA, Numeric):
             ),
         )
 
-    def deserialize(self):
-        return Descriptor.unpack(bytearray(self.data().tobytes()))
+    def __repr__(self):
+        return f'Byte({repr(self._data)})'
+
+    def deserialize(self, conn=None):
+        return Descriptor.unpack(bytearray(self.data().tobytes()), conn=conn)
 
 class Int16Array(DescriptorA, Numeric):
     def __init__(self, data=[]):
+        if isinstance(data, Descriptor):
+            data = data.data()
+            
         data = numpy.array(data, dtype=numpy.int16)
 
         super().__init__(
@@ -812,8 +936,14 @@ class Int16Array(DescriptorA, Numeric):
             ),
         )
 
+    def __repr__(self):
+        return f'Word({repr(self._data)})'
+
 class Int32Array(DescriptorA, Numeric):
     def __init__(self, data=[]):
+        if isinstance(data, Descriptor):
+            data = data.data()
+            
         data = numpy.array(data, dtype=numpy.int32)
 
         super().__init__(
@@ -824,8 +954,14 @@ class Int32Array(DescriptorA, Numeric):
             ),
         )
 
+    def __repr__(self):
+        return f'Long({repr(self._data)})'
+
 class Int64Array(DescriptorA, Numeric):
     def __init__(self, data=[]):
+        if isinstance(data, Descriptor):
+            data = data.data()
+            
         data = numpy.array(data, dtype=numpy.int64)
 
         super().__init__(
@@ -836,8 +972,14 @@ class Int64Array(DescriptorA, Numeric):
             ),
         )
 
+    def __repr__(self):
+        return f'Quadword({repr(self._data)})'
+
 class Float32Array(DescriptorA, Numeric):
     def __init__(self, data=[]):
+        if isinstance(data, Descriptor):
+            data = data.data()
+            
         data = numpy.array(data, dtype=numpy.float32)
 
         super().__init__(
@@ -848,8 +990,14 @@ class Float32Array(DescriptorA, Numeric):
             ),
         )
 
+    def __repr__(self):
+        return f'FS_FLOAT({repr(self._data)})'
+
 class Float64Array(DescriptorA, Numeric):
     def __init__(self, data=[]):
+        if isinstance(data, Descriptor):
+            data = data.data()
+            
         data = numpy.array(data, dtype=numpy.float64)
 
         super().__init__(
@@ -859,6 +1007,9 @@ class Float64Array(DescriptorA, Numeric):
                 dtype_id=DTYPE_FT,
             ),
         )
+
+    def __repr__(self):
+        return f'FT_FLOAT({repr(self._data)})'
     
 ###
 ### DescriptorAPD
@@ -942,6 +1093,9 @@ class List(DescriptorAPD):
 
         data = []
 
+        if len(items) == 1 and isinstance(items[0], Descriptor):
+            items = items[0].data()
+
         # If this has been called as List(list)
         if len(items) == 1 and isinstance(items[0], (list, tuple)):
             for item in items[0]:
@@ -961,6 +1115,11 @@ class List(DescriptorAPD):
             )
         )
 
+    def __repr__(self):
+        if len(self._data) == 0:
+            return 'List()'
+        return f'List(,{",".join(map(repr, self._data))})'
+
     def __len__(self):
         return len(self._data)
 
@@ -976,7 +1135,11 @@ class List(DescriptorAPD):
     
     def append(self, value):
         self._data.append(Descriptor.from_data(value))
-        self._dsc.arsize += self._dsc.length
+        self._dsc.arsize = len(self._data) * self._dsc.length
+
+    def remove(self, value):
+        self._data.remove(Descriptor.from_data(value))
+        self._dsc.arsize = len(self._data) * self._dsc.length
 
     def data(self):
         return self._data
@@ -988,6 +1151,9 @@ class Tuple(DescriptorAPD):
 
         data = []
 
+        if len(items) == 1 and isinstance(items[0], Descriptor):
+            items = items[0].data()
+            
         # If this has been called as Tuple(tuple)
         if len(items) == 1 and isinstance(items[0], (list, tuple)):
             for item in items[0]:
@@ -1007,6 +1173,11 @@ class Tuple(DescriptorAPD):
             )
         )
 
+    def __repr__(self):
+        if len(self._data) == 0:
+            return 'Tuple()'
+        return f'Tuple(,{",".join(map(repr, self._data))})'
+
     def __len__(self):
         return len(self._data)
 
@@ -1023,6 +1194,9 @@ class Dictionary(DescriptorAPD):
     
     # dict or key, value, ...repeat
     def __init__(self, *pairs, descs=[]):
+
+        if len(pairs) == 1 and isinstance(pairs[0], Descriptor):
+            pairs = pairs[0].data()
 
         # If this has been called as Dictionary(dict)
         if len(pairs) == 1 and isinstance(pairs[0], dict):
@@ -1056,6 +1230,11 @@ class Dictionary(DescriptorAPD):
 
     def __repr__(self):
         return f'Dictionary({", ".join(list(map(repr, self.items())))})'
+
+    def __repr__(self):
+        if len(self._data) == 0:
+            return 'Dict()'
+        return f'Dict(,{",".join([ f" {repr(k)},{repr(v)}" for k,v in self._data.items() ])})'
     
     def __len__(self):
         return len(self._data)
@@ -1099,6 +1278,8 @@ class Dictionary(DescriptorAPD):
 ###
 ### DescriptorR
 ###
+
+# TODO: data = Signal(); data2 = Signal(data)
 
 class DescriptorR(Descriptor):
 
@@ -1196,6 +1377,9 @@ class Signal(DescriptorR):
     def dimensions(self):
         return self._dscptrs[2 : ]
 
+    def __repr__(self):
+        return f'Build_Signal({", ".join(map(repr, self._dscptrs))})'
+
     def data(self):
         if type(self.value) is not Descriptor:
             return self.value.data()
@@ -1225,6 +1409,9 @@ class Dimension(DescriptorR):
     def axis(self):
         return self._dscptrs[1]
 
+    def __repr__(self):
+        return f'Build_Dimension({", ".join(map(repr, self._dscptrs))})'
+
 class Window(DescriptorR):
     
     def __init__(self, startidx=None, endingidx=None, value_at_idx0=None):
@@ -1247,6 +1434,9 @@ class Window(DescriptorR):
     def value_at_idx0(self):
         return self._dscptrs[2]
 
+    def __repr__(self):
+        return f'Build_Window({", ".join(map(repr, self._dscptrs))})'
+
 class Slope(DescriptorR):
     
     # slope, begin, ending, ...repeat
@@ -1268,9 +1458,18 @@ class Slope(DescriptorR):
             segments.append((self._dscptrs[i], self._dscptrs[i + 1], self._dscptrs[i + 2]))
         return segments
 
+    def __repr__(self):
+        return f'Build_Slope({", ".join(map(repr, self._dscptrs))})'
+
 class Function(DescriptorR):
     
-    def __init__(self, opcode = 0, *arguments):
+    def __init__(self, opcode=0, *arguments):
+
+        # e.g. 'ADD' -> 38
+        if isinstance(opcode, str):
+            from .internals.opcbuiltins import OPCODE_MAP
+            opcode = OPCODE_MAP.get(opcode.upper(), -1)
+
         super().__init__(
             data=numpy.uint16(opcode),
             dscptrs=[*arguments],
@@ -1288,10 +1487,13 @@ class Function(DescriptorR):
         return self._dscptrs
 
     def __repr__(self):
-        return f'Function({self._data}, {", ".join(map(repr, self._dscptrs))})'
+        from .internals.opcbuiltins import OPCODE_REPR_MAP
+        if self._data in OPCODE_REPR_MAP:
+            return OPCODE_REPR_MAP[self._data](*self._dscptrs)
+        return f'Build_Function({self._data}, {", ".join(map(repr, self._dscptrs))})'
     
     def data(self):
-        raise Exception('Functions are not implemented')
+        raise Exception('Evaluating functions is not implemented')
 
 class Conglom(DescriptorR):
     
@@ -1319,6 +1521,9 @@ class Conglom(DescriptorR):
     def qualifiers(self):
         return self._dscptrs[3]
 
+    def __repr__(self):
+        return f'Build_Conglom({", ".join(map(repr, self._dscptrs))})'
+
 class Range(DescriptorR):
     
     def __init__(self, begin=None, ending=None, deltaval=None):
@@ -1340,6 +1545,9 @@ class Range(DescriptorR):
     @property
     def deltaval(self):
         return self._dscptrs[2]
+
+    def __repr__(self):
+        return f'Build_Range({", ".join(map(repr, self._dscptrs))})'
     
     def data(self):
         return range(self.begin.data(), self.ending.data(), self.deltaval.data())
@@ -1376,9 +1584,12 @@ class Action(DescriptorR):
     def performance(self):
         return self._dscptrs[4]
 
+    def __repr__(self):
+        return f'Build_Action({", ".join(map(repr, self._dscptrs))})'
+
 class Dispatch(DescriptorR):
     
-    def __init__(self, treesched = 0, ident=None, phase=None, when=None, completion=None):
+    def __init__(self, treesched=0, ident=None, phase=None, when=None, completion=None):
         super().__init__(
             data=numpy.uint8(treesched),
             dscptrs=[ident, phase, when, completion],
@@ -1407,6 +1618,9 @@ class Dispatch(DescriptorR):
     def completion(self):
         return self._dscptrs[3]
 
+    def __repr__(self):
+        return f'Build_Dispatch({self._data}, {", ".join(map(repr, self._dscptrs))})'
+
 class Program(DescriptorR):
     
     def __init__(self, time_out=None, program=None):
@@ -1424,6 +1638,9 @@ class Program(DescriptorR):
     @property
     def program(self):
         return self._dscptrs[1]
+
+    def __repr__(self):
+        return f'Build_Program({", ".join(map(repr, self._dscptrs))})'
     
     def data(self):
         raise Exception('Programs are not implemented')
@@ -1453,6 +1670,9 @@ class Routine(DescriptorR):
     @property
     def arguments(self):
         return self._dscptrs[3 : ]
+
+    def __repr__(self):
+        return f'Build_Routine({", ".join(map(repr, self._dscptrs))})'
     
     def data(self):
         raise Exception('Routines are not implemented')
@@ -1482,6 +1702,9 @@ class Procedure(DescriptorR):
     @property
     def arguments(self):
         return self._dscptrs[3 : ]
+
+    def __repr__(self):
+        return f'Build_Procedure({", ".join(map(repr, self._dscptrs))})'
     
     def data(self):
         raise Exception('Procedures are not implemented')
@@ -1507,13 +1730,16 @@ class Method(DescriptorR):
     @property
     def device(self):
         return self._dscptrs[2]
+
+    def __repr__(self):
+        return f'Build_Method({", ".join(map(repr, self._dscptrs))})'
     
     def data(self):
         raise Exception('Methods are not implemented')
 
 class Dependency(DescriptorR):
     
-    def __init__(self, treedep = 0, *arguments):
+    def __init__(self, treedep=0, *arguments):
         super().__init__(
             data=numpy.uint8(treedep),
             dscptrs=[*arguments],
@@ -1529,6 +1755,9 @@ class Dependency(DescriptorR):
     @property
     def arguments(self):
         return self._dscptrs
+
+    def __repr__(self):
+        return f'Build_Dependency({self._data}, {", ".join(map(repr, self._dscptrs))})'
     
     def data(self):
         raise Exception('Dependencies are not implemented')
@@ -1552,6 +1781,9 @@ class Condition(DescriptorR):
     def condition(self):
         return self._dscptrs[0]
 
+    def __repr__(self):
+        return f'Build_Condition({self._data}, {", ".join(map(repr, self._dscptrs))})'
+
 class WithUnits(DescriptorR):
     
     def __init__(self, value=None, units=None):
@@ -1569,6 +1801,9 @@ class WithUnits(DescriptorR):
     @property
     def units(self):
         return self._dscptrs[1]
+
+    def __repr__(self):
+        return f'Build_With_Units({", ".join(map(repr, self._dscptrs))})'
 
     def data(self):
         return self.value.data()
@@ -1599,6 +1834,9 @@ class Call(DescriptorR):
     @property
     def arguments(self):
         return self._dscptrs[2 : ]
+
+    def __repr__(self):
+        return f'Build_Call({self._data}, {", ".join(map(repr, self._dscptrs))})'
     
     def data(self):
         raise Exception('Calls are not implemented')
@@ -1620,6 +1858,9 @@ class WithError(DescriptorR):
     @property
     def error(self):
         return self._dscptrs[1]
+
+    def __repr__(self):
+        return f'Build_With_Error({", ".join(map(repr, self._dscptrs))})'
     
     def getException(self):
         return getExceptionFromError(self.error.data())
@@ -1644,6 +1885,9 @@ class Opaque(DescriptorR):
     @property
     def opaque_type(self):
         return self._dscptrs[1]
+
+    def __repr__(self):
+        return f'Build_Opaque({", ".join(map(repr, self._dscptrs))})'
     
     def data(self):
         return self.value.data()
@@ -1666,8 +1910,8 @@ DTYPE_CLASS_MAP = {
         CLASS_MISSING: Descriptor,
         DTYPE_T: String,
         DTYPE_IDENT: Ident,
-        DTYPE_PATH: Path,
-        DTYPE_NID: NID,
+        DTYPE_PATH: TreePath,
+        DTYPE_NID: TreeNID,
         DTYPE_BU: UInt8,
         DTYPE_WU: UInt16,
         DTYPE_LU: UInt32,
